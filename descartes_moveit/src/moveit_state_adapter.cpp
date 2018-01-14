@@ -22,6 +22,7 @@
 #include "descartes_core/pretty_print.hpp"
 #include "descartes_moveit/seed_search.h"
 
+#include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <random_numbers/random_numbers.h>
 #include <ros/assert.h>
@@ -68,21 +69,24 @@ MoveitStateAdapter::MoveitStateAdapter() : world_to_root_(Eigen::Affine3d::Ident
 }
 
 bool MoveitStateAdapter::initialize(const std::string& robot_description, const std::string& group_name,
-                                    const std::string& world_frame, const std::string& tcp_frame)
-{
-  // Initialize MoveIt state objects
-  robot_model_loader_.reset(new robot_model_loader::RobotModelLoader(robot_description));
+                                    const std::string& world_frame, const std::string& tcp_frame,
+                                    planning_scene_monitor::PlanningSceneMonitorPtr psm)
 
-  return initialize(robot_model_loader_->getModel(), group_name, world_frame, tcp_frame);
+{
+  robot_description_ = robot_description;
+  // Initialize MoveIt state objects
+  robot_model_loader_.reset(new robot_model_loader::RobotModelLoader(robot_description_));
+
+  return initialize(robot_model_loader_->getModel(), group_name, world_frame, tcp_frame, psm);
 }
 
 bool MoveitStateAdapter::initialize(robot_model::RobotModelConstPtr robot_model, const std::string &group_name,
-                                    const std::string &world_frame, const std::string &tcp_frame)
+                                    const std::string &world_frame, const std::string &tcp_frame,
+                                    planning_scene_monitor::PlanningSceneMonitorPtr psm)
 {
   robot_model_ptr_ = robot_model;
   robot_state_.reset(new moveit::core::RobotState(robot_model_ptr_));
   robot_state_->setToDefaultValues();
-  planning_scene_.reset(new planning_scene::PlanningScene(robot_model));
   joint_group_ = robot_model_ptr_->getJointModelGroup(group_name);
 
   // Assign robot frames
@@ -131,6 +135,15 @@ bool MoveitStateAdapter::initialize(robot_model::RobotModelConstPtr robot_model,
     world_to_root_ = descartes_core::Frame(root_to_world.inverse());
   }
 
+  if(psm)
+  {
+    planning_scene_monitor_ = psm;
+  }
+  else
+  {
+    planning_scene_monitor_.reset(new planning_scene_monitor::PlanningSceneMonitor(robot_description_));
+  }
+  planning_scene_monitor_->startSceneMonitor();
   return true;
 }
 
@@ -153,7 +166,7 @@ bool MoveitStateAdapter::getIK(const Eigen::Affine3d& pose, std::vector<double>&
     robot_state_->copyJointGroupPositions(group_name_, joint_pose);
     if (!isValid(joint_pose))
     {
-      ROS_DEBUG_STREAM("Robot joint pose is invalid");
+      logDebug("MoveitStateAdapter.getIK: Robot joint pose is invalid");
     }
     else
     {
@@ -175,7 +188,7 @@ bool MoveitStateAdapter::getAllIK(const Eigen::Affine3d& pose, std::vector<std::
   // in the middle of a discretization step could be double counted.  In reality, we'd like solutions
   // to be further apart than this.
   double epsilon = 4 * joint_group_->getSolverInstance()->getSearchDiscretization();
-  logDebug("Utilizing an min. difference of %f between IK solutions", epsilon);
+  logDebug("MoveitStateAdapter.getAllIK: Utilizing an min. difference of %f between IK solutions", epsilon);
   joint_poses.clear();
   for (size_t sample_iter = 0; sample_iter < seed_states_.size(); ++sample_iter)
   {
@@ -186,14 +199,16 @@ bool MoveitStateAdapter::getAllIK(const Eigen::Affine3d& pose, std::vector<std::
       if (joint_poses.empty())
       {
         std::stringstream msg;
-        msg << "Found *first* solution on " << sample_iter << " iteration, joint: " << joint_pose;
+        msg << "MoveitStateAdapter.getAllIK: " << "Found *first* solution on " << sample_iter
+            << " iteration, joint: " << joint_pose;
         logDebug(msg.str().c_str());
         joint_poses.push_back(joint_pose);
       }
       else
       {
         std::stringstream msg;
-        msg << "Found *potential* solution on " << sample_iter << " iteration, joint: " << joint_pose;
+        msg << "MoveitStateAdapter.getAllIK: " << "Found *potential* solution on " << sample_iter
+            << " iteration, joint: " << joint_pose;
         logDebug(msg.str().c_str());
 
         std::vector<std::vector<double> >::iterator joint_pose_it;
@@ -202,7 +217,7 @@ bool MoveitStateAdapter::getAllIK(const Eigen::Affine3d& pose, std::vector<std::
         {
           if (descartes_core::utils::equal(joint_pose, (*joint_pose_it), epsilon))
           {
-            logDebug("Found matching, potential solution is not new");
+            logDebug("MoveitStateAdapter.getAllIK: Found matching, potential solution is not new");
             match_found = true;
             break;
           }
@@ -210,7 +225,8 @@ bool MoveitStateAdapter::getAllIK(const Eigen::Affine3d& pose, std::vector<std::
         if (!match_found)
         {
           std::stringstream msg;
-          msg << "Found *new* solution on " << sample_iter << " iteration, joint: " << joint_pose;
+          msg << "MoveitStateAdapter.getAllIK: " << "Found *new* solution on " << sample_iter
+              << " iteration, joint: " << joint_pose;
           logDebug(msg.str().c_str());
           joint_poses.push_back(joint_pose);
         }
@@ -218,17 +234,17 @@ bool MoveitStateAdapter::getAllIK(const Eigen::Affine3d& pose, std::vector<std::
     }
   }
 
-  logDebug("Found %lu joint solutions out of %lu iterations", static_cast<unsigned long>(joint_poses.size()),
+  logDebug("MoveitStateAdapter.getAllIK: Found %lu joint solutions out of %lu iterations", static_cast<unsigned long>(joint_poses.size()),
            static_cast<unsigned long>(seed_states_.size()));
 
   if (joint_poses.empty())
   {
-    logError("Found 0 joint solutions out of %lu iterations", static_cast<unsigned long>(seed_states_.size()));
+    logError("MoveitStateAdapter.getAllIK: Found 0 joint solutions out of %lu iterations", static_cast<unsigned long>(seed_states_.size()));
     return false;
   }
   else
   {
-    logInform("Found %lu joint solutions out of %lu iterations", static_cast<unsigned long>(joint_poses.size()),
+    logInform("MoveitStateAdapter.getAllIK: Found %lu joint solutions out of %lu iterations", static_cast<unsigned long>(joint_poses.size()),
               static_cast<unsigned long>(seed_states_.size()));
     return true;
   }
@@ -239,9 +255,17 @@ bool MoveitStateAdapter::isInCollision(const std::vector<double>& joint_pose) co
   bool in_collision = false;
   if (check_collisions_)
   {
+    std::unique_ptr<planning_scene_monitor::LockedPlanningSceneRO> ls(new planning_scene_monitor::LockedPlanningSceneRO(planning_scene_monitor_));
+
+    // (*ls)->printKnownObjects(std::cout);
+
     robot_state_->setJointGroupPositions(group_name_, joint_pose);
-    in_collision = planning_scene_->isStateColliding(*robot_state_, group_name_);
+    robot_state_->update();
+
+    // If either there is no locked planning scene or if the state is colliding return false
+    in_collision = !(*ls) || (*ls)->isStateColliding(*robot_state_, group_name_);
   }
+
   return in_collision;
 }
 
@@ -258,13 +282,13 @@ bool MoveitStateAdapter::getFK(const std::vector<double>& joint_pose, Eigen::Aff
     }
     else
     {
-      logError("Robot state does not recognize tool frame: %s", tool_frame_.c_str());
+      logError("MoveitStateAdapter.getFK: Robot state does not recognize tool frame: %s", tool_frame_.c_str());
       rtn = false;
     }
   }
   else
   {
-    logError("Invalid joint pose passed to get forward kinematics");
+    logInform("MoveitStateAdapter.getFK: Invalid joint pose passed to get forward kinematics");
     rtn = false;
   }
 
@@ -285,10 +309,16 @@ bool MoveitStateAdapter::isValid(const std::vector<double>& joint_pose) const
   // Satisfies joint positional bounds?
   if (!joint_group_->satisfiesPositionBounds(joint_pose.data()))
   {
+    logError("Joint pose does not satisfy positional bounds");
     return false;
   }
   // Is in collision (if collision is active)
-  return !isInCollision(joint_pose);
+  if (isInCollision(joint_pose))
+  {
+    logInform("MoveitStateAdapter.isValid: Joint pose is in collision");
+    return false;
+  }
+  return true;
 }
 
 bool MoveitStateAdapter::isValid(const Eigen::Affine3d& pose) const
@@ -325,10 +355,12 @@ std::vector<double> MoveitStateAdapter::getJointVelocityLimits() const
 
 void MoveitStateAdapter::setState(const moveit::core::RobotState& state)
 {
-  ROS_ASSERT_MSG(static_cast<bool>(robot_state_), "'robot_state_' member pointer is null. Have you called "
+  if(static_cast<bool>(robot_state_)){
+    logError("'robot_state_' member pointer is null. Have you called "
                                                   "initialize()?");
+  }
   *robot_state_ = state;
-  planning_scene_->setCurrentState(state);
+  planning_scene_monitor::LockedPlanningSceneRW(planning_scene_monitor_)->setCurrentState(state);
 }
 
 }  // descartes_moveit

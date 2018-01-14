@@ -17,6 +17,7 @@
  */
 
 #include "descartes_moveit/ikfast_moveit_state_adapter.h"
+#include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 
 #include <eigen_conversions/eigen_msg.h>
 #include <ros/node_handle.h>
@@ -54,9 +55,10 @@ static size_t closestJointPose(const std::vector<double>& target, const std::vec
 bool descartes_moveit::IkFastMoveitStateAdapter::initialize(const std::string& robot_description,
                                                             const std::string& group_name,
                                                             const std::string& world_frame,
-                                                            const std::string& tcp_frame)
+                                                            const std::string& tcp_frame,
+                                                            planning_scene_monitor::PlanningSceneMonitorPtr psm)
 {
-  if (!MoveitStateAdapter::initialize(robot_description, group_name, world_frame, tcp_frame))
+  if (!MoveitStateAdapter::initialize(robot_description, group_name, world_frame, tcp_frame, psm))
   {
     return false;
   }
