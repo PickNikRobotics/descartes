@@ -26,6 +26,7 @@
 
 namespace planning_scene_monitor
 {
+  MOVEIT_CLASS_FORWARD(PlanningSceneMonitor);
   class PlanningSceneMonitor;
 }
 
