@@ -315,7 +315,6 @@ bool MoveitStateAdapter::isValid(const std::vector<double>& joint_pose) const
   // Is in collision (if collision is active)
   if (isInCollision(joint_pose))
   {
-    logInform("MoveitStateAdapter.isValid: Joint pose is in collision");
     return false;
   }
   return true;
