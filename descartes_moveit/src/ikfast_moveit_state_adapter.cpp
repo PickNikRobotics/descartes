@@ -72,12 +72,9 @@ bool descartes_moveit::IkFastMoveitStateAdapter::getAllIK(const Eigen::Affine3d&
   joint_poses.clear();
   const auto& solver = joint_group_->getSolverInstance();
 
-  // Transform input pose
-  Eigen::Affine3d tool_pose = world_to_base_.frame_inv * pose * tool0_to_tip_.frame;
-
   // convert to geometry_msgs ...
   geometry_msgs::Pose geometry_pose;
-  tf::poseEigenToMsg(tool_pose, geometry_pose);
+  tf::poseEigenToMsg(pose, geometry_pose);
   std::vector<geometry_msgs::Pose> poses = { geometry_pose };
 
   std::vector<double> dummy_seed(getDOF(), 0.0);
