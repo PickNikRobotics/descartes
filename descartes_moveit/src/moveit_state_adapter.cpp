@@ -68,21 +68,35 @@ MoveitStateAdapter::MoveitStateAdapter() : world_to_root_(Eigen::Affine3d::Ident
 {
 }
 
+// bool MoveitStateAdapter::initialize(const std::string &robot_description, const std::string &group_name,
+//                                     const std::string &world_frame, const std::string &tcp_frame)
+// {
+//   planning_scene_monitor::PlanningSceneMonitorPtr psm(new planning_scene_monitor::PlanningSceneMonitor(robot_description));
+//   return initialize(robot_description, group_name, world_frame, tcp_frame, psm);
+// }
+
+
+// bool MoveitStateAdapter::initialize(robot_model::RobotModelConstPtr robot_model, const std::string &group_name,
+//                                     const std::string &world_frame, const std::string &tcp_frame)
+// {
+//   planning_scene_monitor::PlanningSceneMonitorPtr psm(new planning_scene_monitor::PlanningSceneMonitor(robot_description_));
+//   return initialize(robot_model, group_name, world_frame, tcp_frame, psm);
+// }
+
+
 bool MoveitStateAdapter::initialize(const std::string& robot_description, const std::string& group_name,
-                                    const std::string& world_frame, const std::string& tcp_frame,
-                                    planning_scene_monitor::PlanningSceneMonitorPtr psm)
+                                    const std::string& world_frame, const std::string& tcp_frame)
 
 {
   robot_description_ = robot_description;
   // Initialize MoveIt state objects
   robot_model_loader_.reset(new robot_model_loader::RobotModelLoader(robot_description_));
 
-  return initialize(robot_model_loader_->getModel(), group_name, world_frame, tcp_frame, psm);
+  return initialize(robot_model_loader_->getModel(), group_name, world_frame, tcp_frame);
 }
 
 bool MoveitStateAdapter::initialize(robot_model::RobotModelConstPtr robot_model, const std::string &group_name,
-                                    const std::string &world_frame, const std::string &tcp_frame,
-                                    planning_scene_monitor::PlanningSceneMonitorPtr psm)
+                                    const std::string &world_frame, const std::string &tcp_frame)
 {
   robot_model_ptr_ = robot_model;
   robot_state_.reset(new moveit::core::RobotState(robot_model_ptr_));
@@ -134,16 +148,18 @@ bool MoveitStateAdapter::initialize(robot_model::RobotModelConstPtr robot_model,
     world_to_root_ = descartes_core::Frame(root_to_world.inverse());
   }
 
-  if(psm)
-  {
-    planning_scene_monitor_ = psm;
-  }
-  else
+  if (!planning_scene_monitor_)
   {
     planning_scene_monitor_.reset(new planning_scene_monitor::PlanningSceneMonitor(robot_description_));
+    planning_scene_monitor_->startSceneMonitor();
   }
-  planning_scene_monitor_->startSceneMonitor();
   return true;
+}
+
+void MoveitStateAdapter::setPlanningSceneMonitor(planning_scene_monitor::PlanningSceneMonitorPtr& psm)
+{
+  planning_scene_monitor_ = psm;
+  planning_scene_monitor_->startSceneMonitor();
 }
 
 bool MoveitStateAdapter::getIK(const Eigen::Affine3d& pose, const std::vector<double>& seed_state,

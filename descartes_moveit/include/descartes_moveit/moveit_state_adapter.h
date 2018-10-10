@@ -35,6 +35,8 @@ namespace planning_scene_monitor
 
 namespace descartes_moveit
 {
+  DESCARTES_CLASS_FORWARD(MoveitStateAdapter);
+
 /**
  * @brief MoveitStateAdapter adapts the MoveIt RobotState to the Descartes RobotModel interface
  */
@@ -48,12 +50,19 @@ public:
   }
 
   virtual bool initialize(const std::string &robot_description, const std::string &group_name,
-                          const std::string &world_frame, const std::string &tcp_frame,
-                          planning_scene_monitor::PlanningSceneMonitorPtr psm = nullptr);
+                          const std::string &world_frame, const std::string &tcp_frame);
+
+  // virtual bool initialize(const std::string &robot_description, const std::string &group_name,
+  //                         const std::string &world_frame, const std::string &tcp_frame,
+  //                         planning_scene_monitor::PlanningSceneMonitorPtr psm);
 
   virtual bool initialize(robot_model::RobotModelConstPtr robot_model, const std::string &group_name,
-                          const std::string &world_frame, const std::string &tcp_frame,
-                          planning_scene_monitor::PlanningSceneMonitorPtr psm = nullptr);
+                          const std::string &world_frame, const std::string &tcp_frame);
+
+  // virtual bool initialize(robot_model::RobotModelConstPtr robot_model, const std::string &group_name,
+  //                         const std::string &world_frame, const std::string &tcp_frame,
+  //                         planning_scene_monitor::PlanningSceneMonitorPtr psm);
+  virtual void setPlanningSceneMonitor(planning_scene_monitor::PlanningSceneMonitorPtr& psm);
 
   virtual bool getIK(const Eigen::Affine3d &pose, const std::vector<double> &seed_state,
                      std::vector<double> &joint_pose) const;
