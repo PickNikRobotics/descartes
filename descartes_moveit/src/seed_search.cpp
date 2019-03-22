@@ -30,7 +30,7 @@ bool doFK(moveit::core::RobotState& state, const moveit::core::JointModelGroup* 
     return false;
   }
 
-  result = toIsometry(state.getFrameTransform(tool));
+  result = state.getFrameTransform(tool);
   return true;
 }
 

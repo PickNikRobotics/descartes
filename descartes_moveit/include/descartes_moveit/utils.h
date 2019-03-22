@@ -30,32 +30,6 @@
 namespace descartes_moveit
 {
 
-/**
- * @brief utility function that converts an Eigen Affine Transform type to an Isometry one.
- * @param t The Affine transform
- * @return  An Isometry transform
- */
-template <class T>
-static Eigen::Transform<T,3,Eigen::Isometry> toIsometry(const Eigen::Transform<T,3,Eigen::Affine>& t)
-{
-  Eigen::Transform<T,3,Eigen::Isometry> o;
-  o.translation() = t.translation();
-  o.linear() = t.rotation();
-  return std::move(o);
-}
-
-/**
- * @brief workaround to allow compatibility with previous versions of MoveIt! that used Affine3 as the
- *  preferred transform type.
- * @param t The Affine transform
- * @return  An Isometry transform
- */
-template <class T>
-static Eigen::Transform<T,3,Eigen::Isometry> toIsometry(const Eigen::Transform<T,3,Eigen::Isometry>& t)
-{
-  return std::move(Eigen::Transform<T,3,Eigen::Isometry>(t));
-}
-
 }
 
 
